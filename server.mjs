@@ -625,6 +625,100 @@ app.post("/api/backtest", async (req, res) => {
   }
 });
 
+// ── GET /api/quote?ticker=AAPL ────────────────────────────────
+// Devuelve nombre, sector, industria y precio actual
+app.get("/api/quote", async (req, res) => {
+  const ticker = (req.query.ticker || "").toUpperCase().trim();
+  if (!ticker) return res.status(400).json({ error: "Falta ticker" });
+
+  const HEADERS = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    Accept: "application/json",
+    Referer: "https://finance.yahoo.com/",
+  };
+
+  try {
+    // Yahoo Finance v11 quote endpoint devuelve sector, industria, precio
+    const url = `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(
+      ticker
+    )}?modules=assetProfile,price`;
+    const res2 = await fetch(url, { headers: HEADERS });
+    const json = await res2.json();
+
+    const profile = json?.quoteSummary?.result?.[0]?.assetProfile || {};
+    const price = json?.quoteSummary?.result?.[0]?.price || {};
+
+    return res.json({
+      ticker,
+      name: price.longName || price.shortName || ticker,
+      sector: profile.sector || price.sector || null,
+      industry: profile.industry || null,
+      type: price.quoteType || null, // EQUITY, ETF, CRYPTOCURRENCY, etc.
+      currency: price.currency || "USD",
+      price: price.regularMarketPrice?.raw || null,
+    });
+  } catch (err) {
+    console.error("[quote]", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/sector/:ticker ────────────────────────────────────
+// Obtiene sector, industria y descripción de Yahoo Finance en tiempo real.
+// Permite mostrar info de cualquier stock, no solo los del diccionario.
+app.get("/api/sector/:ticker", async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase();
+  const cKey = `sector|${ticker}`;
+  const cached = cacheGet(cKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const url =
+      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(
+        ticker
+      )}` + `?modules=assetProfile,summaryDetail,price`;
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+        Accept: "application/json",
+        Referer: "https://finance.yahoo.com/",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!r.ok) throw new Error(`Yahoo ${r.status}`);
+
+    const json = await r.json();
+    const profile = json?.quoteSummary?.result?.[0]?.assetProfile || {};
+    const price = json?.quoteSummary?.result?.[0]?.price || {};
+
+    const info = {
+      ticker,
+      name: price.longName || price.shortName || ticker,
+      sector: profile.sector || price.sector || null,
+      industry: profile.industry || null,
+      country: profile.country || null,
+      description: profile.longBusinessSummary
+        ? profile.longBusinessSummary.slice(0, 300) + "…"
+        : null,
+      currency: price.currency || "USD",
+      type: price.quoteType || null,
+    };
+
+    cacheSet(cKey, info);
+    return res.json(info);
+  } catch (err) {
+    console.warn(`[sector] ${ticker}: ${err.message}`);
+    return res.json({
+      ticker,
+      sector: null,
+      industry: null,
+      description: null,
+    });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`✅  Servidor listo en http://localhost:${PORT}`)

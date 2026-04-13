@@ -185,6 +185,96 @@ const NAMES = {
   "BNB-USD": "BNB",
 };
 
+// ── Sectores / categoría por activo ───────────────────────────
+const SECTORS = {
+  // ETFs índice USA
+  VOO: "Índice S&P 500",
+  SPY: "Índice S&P 500",
+  IVV: "Índice S&P 500",
+  VTI: "Mercado total USA",
+  ITOT: "Mercado total USA",
+  QQQ: "Nasdaq / Tech",
+  QQQM: "Nasdaq / Tech",
+  IWM: "Small Caps USA",
+  VB: "Small Caps USA",
+  VUG: "Growth USA",
+  VONG: "Growth USA",
+  VTV: "Value USA",
+  VBR: "Value Small-Cap",
+  DIA: "Dow Jones Industrial",
+  // Internacional
+  VXUS: "Internacional ex-USA",
+  VEA: "Mercados desarrollados",
+  VWO: "Emergentes",
+  EEM: "Emergentes",
+  AVUV: "Small-Cap Value factor",
+  INDA: "India",
+  EWZ: "Brasil",
+  FXI: "China",
+  // Bonos
+  BND: "Bonos USA total",
+  AGG: "Bonos USA total",
+  TLT: "Bonos largo plazo",
+  IEF: "Bonos mediano plazo",
+  LQD: "Bonos corporativos",
+  HYG: "High Yield",
+  VTIP: "TIPS inflación",
+  // Dividendos / Income
+  SCHD: "Dividendos calidad",
+  VYM: "High Dividend",
+  DGRO: "Dividendos crecimiento",
+  DVY: "Dividendos alto yield",
+  VNQ: "Real Estate (REIT)",
+  VNQI: "REIT internacional",
+  // Sectores
+  XLK: "Tech / Software",
+  SMH: "Semiconductores",
+  SOXX: "Semiconductores",
+  XLF: "Sector financiero",
+  XLE: "Sector energía",
+  XLV: "Sector salud",
+  XLY: "Consumo discrecional",
+  XLP: "Consumo básico",
+  XLI: "Sector industrial",
+  XLB: "Materiales",
+  XLU: "Utilities",
+  ARKK: "Innovación disruptiva",
+  BOTZ: "Robótica / IA",
+  ICLN: "Energía limpia",
+  // Acciones
+  AAPL: "Tech – Consumer",
+  MSFT: "Tech – Cloud / AI",
+  NVDA: "Semiconductores / AI",
+  GOOGL: "Tech – Publicidad / AI",
+  AMZN: "E-commerce / Cloud",
+  META: "Redes sociales",
+  TSLA: "Vehículos eléctricos",
+  "BRK.B": "Holding diversificado",
+  JPM: "Banca",
+  BAC: "Banca",
+  GS: "Banca inversión",
+  // Metales / Commodities
+  GLD: "Oro",
+  IAU: "Oro",
+  GDX: "Mineras de oro",
+  SLV: "Plata",
+  PSLV: "Plata física",
+  USO: "Petróleo crudo",
+  DBC: "Commodities diversificado",
+  // Cripto
+  "BTC-USD": "Bitcoin",
+  "ETH-USD": "Ethereum",
+  "SOL-USD": "Solana",
+  "BNB-USD": "BNB / BSC",
+};
+
+// ── Directorio completo para autocomplete ──────────────────────
+const TICKER_DIR = Object.entries({ ...NAMES }).map(([ticker, name]) => ({
+  ticker,
+  name,
+  sector: SECTORS[ticker] || "",
+}));
+
 let mainChart = null;
 let annualChart = null;
 let divChart = null;
@@ -223,6 +313,128 @@ const btnSave = document.getElementById("btnSave");
 const btnClearAll = document.getElementById("btnClearAll");
 
 // ── Asset rows ─────────────────────────────────────────────────
+// ── Autocomplete functions ────────────────────────────────────
+// ── Caché de sectores obtenidos de Yahoo ──────────────────────
+const sectorCache = {};
+
+async function fetchSector(ticker) {
+  if (sectorCache[ticker]) return sectorCache[ticker];
+  // Use local dict first for known tickers (no network call needed)
+  if (SECTORS[ticker] && NAMES[ticker]) {
+    const info = {
+      sector: SECTORS[ticker],
+      industry: null,
+      name: NAMES[ticker],
+      type: null,
+    };
+    sectorCache[ticker] = info;
+    return info;
+  }
+  // Unknown ticker → call server which queries Yahoo Finance
+  try {
+    const r = await fetch(`/api/sector/${encodeURIComponent(ticker)}`);
+    if (!r.ok) throw new Error("no data");
+    const d = await r.json();
+    const info = {
+      sector: d.sector || SECTORS[ticker] || null,
+      industry: d.industry || null,
+      name: d.name || NAMES[ticker] || ticker,
+      type: d.type || null,
+    };
+    sectorCache[ticker] = info;
+    // Also update NAMES so autocomplete shows the real name
+    if (d.name && !NAMES[ticker]) NAMES[ticker] = d.name;
+    return info;
+  } catch {
+    const fallback = {
+      sector: SECTORS[ticker] || null,
+      industry: null,
+      name: NAMES[ticker] || ticker,
+      type: null,
+    };
+    sectorCache[ticker] = fallback;
+    return fallback;
+  }
+}
+
+window.tickerInput = (input, rowIdx) => {
+  const val = input.value.toUpperCase();
+  input.value = val;
+  updateAsset(rowIdx, "ticker", val);
+  refreshAssetName(input);
+
+  const dd = document.getElementById(`ac-${rowIdx}`);
+  if (!dd) return;
+
+  if (val.length < 1) {
+    hideAC(dd);
+    return;
+  }
+
+  const matches = TICKER_DIR.filter(
+    (t) =>
+      t.ticker.startsWith(val) ||
+      t.name.toLowerCase().includes(val.toLowerCase())
+  ).slice(0, 8);
+
+  if (!matches.length) {
+    hideAC(dd);
+    return;
+  }
+
+  dd.innerHTML = matches
+    .map(
+      (m) => `
+    <div class="ac-item"
+      onmousedown="event.preventDefault();selectTicker(${rowIdx},'${m.ticker}')"
+      ontouchstart="selectTicker(${rowIdx},'${m.ticker}')">
+      <span class="ac-item-ticker">${m.ticker}</span>
+      <span class="ac-item-name">${m.name}</span>
+      ${m.sector ? `<span class="ac-item-sector">${m.sector}</span>` : ""}
+    </div>`
+    )
+    .join("");
+
+  // Position fixed relative to input — bypasses sidebar overflow:hidden
+  const rect = input.getBoundingClientRect();
+  dd.style.cssText = `
+    display:block;
+    position:fixed;
+    top:${rect.bottom + 4}px;
+    left:${rect.left}px;
+    width:${Math.max(280, rect.width)}px;
+    z-index:9000;
+  `;
+};
+
+window.selectTicker = (rowIdx, ticker) => {
+  assets[rowIdx].ticker = ticker;
+  // Pre-fill name
+  if (!NAMES[ticker]) NAMES[ticker] = sectorCache[ticker]?.name || ticker;
+  hideACAll();
+  renderAssetRows();
+};
+
+window.closeAC = (rowIdx) => {
+  const dd = document.getElementById(`ac-${rowIdx}`);
+  if (dd) hideAC(dd);
+};
+
+function hideAC(dd) {
+  if (dd) {
+    dd.innerHTML = "";
+    dd.style.display = "none";
+  }
+}
+function hideACAll() {
+  document.querySelectorAll(".ac-dropdown").forEach((dd) => hideAC(dd));
+}
+
+// Close all dropdowns when clicking outside
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".asset-ticker-wrap")) hideACAll();
+});
+
 function renderAssetRows() {
   const container = document.getElementById("assetRows");
   container.innerHTML = "";
@@ -472,8 +684,11 @@ function renderComposition(list) {
 // ── Asset breakdown ──────────────────────────────────────────
 let _currentBreakdown = null; // para re-renderizar al cambiar tab
 
-function renderAssetBreakdown(breakdown) {
+async function renderAssetBreakdown(breakdown) {
   _currentBreakdown = breakdown;
+
+  // Pre-fetch sectors for all assets in parallel
+  await Promise.all(breakdown.map((a) => fetchSector(a.ticker)));
 
   // ── Tarjetas de resumen ───────────────────────────────────
   const grid = document.getElementById("assetCards");
@@ -481,6 +696,11 @@ function renderAssetBreakdown(breakdown) {
     grid.innerHTML = breakdown
       .map((a, i) => {
         const col = PALETTE[i % PALETTE.length];
+        const cached = sectorCache[a.ticker] || {};
+        // Override sector/name with live Yahoo data if available
+        a._sector = cached.sector || SECTORS[a.ticker] || null;
+        a._industry = cached.industry || null;
+        a._type = cached.type || null;
         const sign = a.cagr >= 0 ? "+" : "";
         const ddCls =
           a.maxDrawdown <= -30
@@ -495,6 +715,13 @@ function renderAssetBreakdown(breakdown) {
             <span class="ac-ticker">${a.ticker}</span>
             <span class="ac-alloc">${a.allocation}%</span>
           </div>
+          ${
+            a._sector
+              ? `<div class="ac-sector">${a._sector}${
+                  a._industry ? " · " + a._industry : ""
+                }</div>`
+              : ""
+          }
           <div class="ac-row">
             <span class="ac-label">CAGR</span>
             <span class="ac-val" style="color:${
