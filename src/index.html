@@ -18,21 +18,23 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   </head>
   <body>
+    <!-- Mobile top bar — always visible on mobile -->
+    <div class="mobile-header" id="mobileHeader">
+      <div class="mobile-brand">
+        <span class="brand-icon">📈</span>
+        <span class="brand-name">InvestLab</span>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Menú">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <!-- Overlay behind open sidebar -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
     <div class="layout">
       <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
       <aside class="sidebar" id="sidebar">
-        <div id="sidebarOverlay" class="sidebar-overlay"></div>
-        <!-- Mobile header (visible only on mobile) -->
-        <div class="mobile-header">
-          <div class="mobile-brand">
-            <span class="brand-icon">📈</span>
-            <span class="brand-name">InvestLab</span>
-          </div>
-          <button class="hamburger" id="hamburger" aria-label="Menú">
-            <span></span><span></span><span></span>
-          </button>
-        </div>
-
         <div class="brand">
           <span class="brand-icon">📈</span>
           <div>

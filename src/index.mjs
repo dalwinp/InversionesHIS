@@ -1484,11 +1484,14 @@ function finish(msg) {
   function openSidebar() {
     sidebar.classList.add("open");
     hamburger.classList.add("open");
-    document.body.style.overflow = "hidden"; // prevent scroll behind drawer
+    if (overlay) overlay.classList.add("visible");
+    document.body.style.overflow = "hidden";
   }
+
   function closeSidebar() {
     sidebar.classList.remove("open");
     hamburger.classList.remove("open");
+    if (overlay) overlay.classList.remove("visible");
     document.body.style.overflow = "";
   }
 
@@ -1496,15 +1499,14 @@ function finish(msg) {
     sidebar.classList.contains("open") ? closeSidebar() : openSidebar()
   );
 
-  // Close when tapping overlay
   overlay?.addEventListener("click", closeSidebar);
 
-  // Auto-close sidebar after running backtest on mobile
+  // Auto-close after running backtest on mobile
   document.getElementById("backtestForm")?.addEventListener("submit", () => {
-    if (window.innerWidth <= 768) closeSidebar();
+    if (window.innerWidth <= 768) setTimeout(closeSidebar, 300);
   });
 
-  // Close on preset tap
+  // Close on preset tap on mobile
   document.querySelectorAll(".pill[data-preset]").forEach((p) =>
     p.addEventListener("click", () => {
       if (window.innerWidth <= 768) closeSidebar();
