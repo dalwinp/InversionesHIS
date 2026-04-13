@@ -9,6 +9,36 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "src")));
 
+// ── Caché en memoria ──────────────────────────────────────────
+// Guarda las últimas respuestas de Yahoo Finance para evitar
+// bloqueos intermitentes. TTL: 4 horas.
+const CACHE = new Map();
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 horas
+
+function cacheKey(ticker, startDate, endDate) {
+  return `${ticker}|${startDate}|${endDate}`;
+}
+function cacheGet(key) {
+  const entry = CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    CACHE.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+function cacheSet(key, data) {
+  CACHE.set(key, { data, ts: Date.now() });
+  // Limpiar entradas viejas si el caché crece mucho
+  if (CACHE.size > 200) {
+    const oldest = [...CACHE.entries()]
+      .sort((a, b) => a[1].ts - b[1].ts)
+      .slice(0, 50)
+      .map((e) => e[0]);
+    oldest.forEach((k) => CACHE.delete(k));
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  FETCH YAHOO FINANCE
 //  Obtiene: precios de cierre RAW (sin ajuste por dividendos) + dividendos reales
@@ -540,10 +570,19 @@ app.post("/api/backtest", async (req, res) => {
   try {
     const rawQuotes = [];
     for (const asset of assets) {
-      await new Promise((r) => setTimeout(r, 350));
-      rawQuotes.push(
-        await fetchYahooMonthly(asset.ticker.toUpperCase(), startDate, endDate)
-      );
+      const ticker = asset.ticker.toUpperCase();
+      const key = cacheKey(ticker, startDate, endDate);
+      const cached = cacheGet(key);
+
+      if (cached) {
+        console.log(`[CACHE HIT] ${ticker}`);
+        rawQuotes.push(cached);
+      } else {
+        await new Promise((r) => setTimeout(r, 350));
+        const quotes = await fetchYahooMonthly(ticker, startDate, endDate);
+        cacheSet(key, quotes);
+        rawQuotes.push(quotes);
+      }
     }
 
     const { aligned, dates } = alignByYearMonth(rawQuotes);
