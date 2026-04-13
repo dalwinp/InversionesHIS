@@ -192,7 +192,7 @@ input:focus,select:focus{border-color:var(--accent)}
 /* ── Main area ───────────────────────────────────────────────── */
 .main{
   padding:20px 24px 32px;overflow-y:auto;
-  display:flex;flex-direction:column;gap:16px;
+  display:flex;flex-direction:column;gap:20px;
 }
 
 /* Empty state */
@@ -244,6 +244,7 @@ input:focus,select:focus{border-color:var(--accent)}
   display:grid;
   grid-template-columns:repeat(5,1fr);
   gap:8px;
+  margin-bottom:4px;
 }
 .metrics-row.four{grid-template-columns:repeat(4,1fr)}
 
@@ -311,7 +312,7 @@ input:focus,select:focus{border-color:var(--accent)}
 }
 
 /* ── Stats extra row ─────────────────────────────────────────── */
-.stats-extra-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.stats-extra-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:4px;}
 .stat-extra{
   background:var(--surf);border:1px solid var(--border);
   border-radius:var(--radius);padding:10px 12px;
