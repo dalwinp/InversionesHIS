@@ -314,6 +314,11 @@ document.querySelectorAll(".pill[data-preset]").forEach((pill) => {
 // ── Submit ────────────────────────────────────────────────────
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  // Dismiss any previous toast/error immediately
+  const prevToast = document.getElementById("toast");
+  if (prevToast) {
+    prevToast.classList.remove("show");
+  }
   hideError();
   setLoading(true);
 
