@@ -22,92 +22,109 @@ async function fetchYahooMonthly(ticker, startDate, endDate) {
   const p1 = Math.floor(new Date(startDate).getTime() / 1000);
   const p2 = Math.floor(new Date(endDate).getTime() / 1000);
 
-  // events=div|split para recibir dividendos y splits en la respuesta
-  const url =
+  const params = `period1=${p1}&period2=${p2}&interval=1mo&includeAdjustedClose=true&events=div%7Csplit`;
+
+  // Intentar con query1 y query2 como fallback
+  const urls = [
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       ticker
-    )}` +
-    `?period1=${p1}&period2=${p2}&interval=1mo&includeAdjustedClose=true&events=div%7Csplit`;
+    )}?${params}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      ticker
+    )}?${params}`,
+    `https://query1.finance.yahoo.com/v7/finance/chart/${encodeURIComponent(
+      ticker
+    )}?${params}`,
+  ];
 
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-      Accept: "application/json",
-    },
-  });
-  if (!res.ok)
-    throw new Error(`Yahoo respondió ${res.status} para "${ticker}"`);
+  const HEADERS = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    Referer: "https://finance.yahoo.com/",
+    Origin: "https://finance.yahoo.com",
+    "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+  };
 
-  const json = await res.json();
-  const result = json?.chart?.result?.[0];
-  if (!result)
-    throw new Error(
-      json?.chart?.error?.description || `Sin datos para "${ticker}"`
-    );
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { headers: HEADERS });
+      if (res.ok) {
+        const json = await res.json();
+        const result = json?.chart?.result?.[0];
+        if (result) {
+          // Éxito — procesar y retornar
+          const timestamps = result.timestamp || [];
+          const rawCloses = result.indicators?.quote?.[0]?.close || [];
+          const adjCloses = result.indicators?.adjclose?.[0]?.adjclose || [];
 
-  const timestamps = result.timestamp || [];
-  // rawClose: no ajustado por dividendos, sí por splits
-  const rawCloses = result.indicators?.quote?.[0]?.close || [];
-  // adjclose: ajustado por dividendos Y splits (lo usamos para validar splits)
-  const adjCloses = result.indicators?.adjclose?.[0]?.adjclose || [];
+          let splitFactor = 1;
+          const splitFactors = new Array(timestamps.length).fill(1);
+          const splitEvents = Object.values(result.events?.splits || {});
+          for (let i = timestamps.length - 1; i >= 0; i--) {
+            splitFactors[i] = splitFactor;
+            const monthEnd = timestamps[i];
+            const monthStart = i > 0 ? timestamps[i - 1] : 0;
+            for (const sp of splitEvents) {
+              if (sp.date >= monthStart && sp.date < monthEnd)
+                splitFactor *= sp.denominator / sp.numerator;
+            }
+          }
 
-  // ── Detectar y aplicar factor de split acumulado ───────────────────────────
-  // Yahoo raw close a veces NO está ajustado por splits → lo ajustamos nosotros
-  // comparando raw/adj. Si hay split, adj << raw (precio baja con split).
-  // Calculamos el ratio split acumulado desde el punto más reciente hacia atrás.
-  let splitFactor = 1;
-  const splitFactors = new Array(timestamps.length).fill(1);
-  // Splits vienen como { timestamp: { date, numerator, denominator } }
-  const splitEvents = Object.values(result.events?.splits || {});
-  for (let i = timestamps.length - 1; i >= 0; i--) {
-    splitFactors[i] = splitFactor;
-    // Si hay un split cuyo timestamp cae en este mes, acumular factor
-    const monthEnd = timestamps[i];
-    const monthStart = i > 0 ? timestamps[i - 1] : 0;
-    for (const sp of splitEvents) {
-      if (sp.date >= monthStart && sp.date < monthEnd) {
-        splitFactor *= sp.denominator / sp.numerator; // split 2:1 → factor ×2
+          const quotes = timestamps
+            .map((ts, i) => {
+              const raw = rawCloses[i];
+              if (raw == null || isNaN(raw)) return null;
+              const close = Number(raw) / splitFactors[i];
+              return {
+                date: new Date(ts * 1000).toISOString().split("T")[0],
+                close: Number.isFinite(close) && close > 0 ? close : NaN,
+                div: 0,
+              };
+            })
+            .filter((q) => q && Number.isFinite(q.close) && q.close > 0);
+
+          const divEvents = Object.values(result.events?.dividends || {});
+          const divByMonth = {};
+          for (const d of divEvents) {
+            const ym = new Date(d.date * 1000).toISOString().slice(0, 7);
+            divByMonth[ym] = (divByMonth[ym] || 0) + Number(d.amount);
+          }
+          for (const q of quotes) q.div = divByMonth[q.date.slice(0, 7)] || 0;
+
+          if (quotes.length < 2)
+            throw new Error(`Datos insuficientes para "${ticker}"`);
+
+          const totalDiv = quotes.reduce((s, q) => s + q.div, 0);
+          console.log(
+            `[${ticker}] ${quotes.length} meses | divs: ${
+              divEvents.length
+            } | total/acción: $${totalDiv.toFixed(4)}`
+          );
+          return quotes;
+        }
       }
+      lastError = new Error(`Yahoo respondió ${res.status} para "${ticker}"`);
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `[${ticker}] falló ${url.includes("query1") ? "query1" : "query2"}: ${
+          err.message
+        }`
+      );
     }
+    await new Promise((r) => setTimeout(r, 400));
   }
-
-  // ── Construir precios ajustados solo por splits (no por dividendos) ────────
-  const quotes = timestamps
-    .map((ts, i) => {
-      const raw = rawCloses[i];
-      if (raw == null || isNaN(raw)) return null;
-      const close = Number(raw) / splitFactors[i]; // ajustado por splits
-      return {
-        date: new Date(ts * 1000).toISOString().split("T")[0],
-        close: Number.isFinite(close) && close > 0 ? close : NaN,
-        div: 0, // se rellenará abajo
-      };
-    })
-    .filter((q) => q && Number.isFinite(q.close) && q.close > 0);
-
-  // ── Agrupar dividendos por mes (YYYY-MM) ──────────────────────────────────
-  // Dividendos: { timestamp: { amount, date } }
-  const divEvents = Object.values(result.events?.dividends || {});
-  const divByMonth = {};
-  for (const d of divEvents) {
-    const ym = new Date(d.date * 1000).toISOString().slice(0, 7);
-    divByMonth[ym] = (divByMonth[ym] || 0) + Number(d.amount);
-  }
-  for (const q of quotes) {
-    q.div = divByMonth[q.date.slice(0, 7)] || 0;
-  }
-
-  if (quotes.length < 2)
-    throw new Error(`Datos insuficientes para "${ticker}" en ese rango.`);
-
-  const totalDiv = quotes.reduce((s, q) => s + q.div, 0);
-  console.log(
-    `[${ticker}] ${quotes.length} meses | dividendos detectados: ${
-      divEvents.length
-    } pagos | total/acción: $${totalDiv.toFixed(4)}`
-  );
-  return quotes;
+  throw lastError || new Error(`No se pudieron obtener datos para "${ticker}"`);
 }
 
 // ── Alinear por año-mes (YYYY-MM) ─────────────────────────────
