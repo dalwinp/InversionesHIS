@@ -55,29 +55,42 @@ async function fetchYahooMonthly(ticker, startDate, endDate) {
   const params = `period1=${p1}&period2=${p2}&interval=1mo&includeAdjustedClose=true&events=div%7Csplit`;
 
   // Intentar con query1 y query2 como fallback
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      ticker
-    )}?${params}`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      ticker
-    )}?${params}`,
-    `https://query1.finance.yahoo.com/v7/finance/chart/${encodeURIComponent(
-      ticker
-    )}?${params}`,
+  // Multiple endpoints + user agents to bypass Railway IP blocks
+  const attempts = [
+    {
+      url: `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+        ticker
+      )}?${params}`,
+      ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    },
+    {
+      url: `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+        ticker
+      )}?${params}`,
+      ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    },
+    {
+      url: `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+        ticker
+      )}?${params}&corsDomain=finance.yahoo.com`,
+      ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    },
+    {
+      url: `https://query1.finance.yahoo.com/v7/finance/chart/${encodeURIComponent(
+        ticker
+      )}?${params}`,
+      ua: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    },
   ];
 
-  const HEADERS = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
+  const baseHeaders = {
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
     "Cache-Control": "no-cache",
     Pragma: "no-cache",
-    Referer: "https://finance.yahoo.com/",
+    Referer: "https://finance.yahoo.com/quote/" + ticker + "/history/",
     Origin: "https://finance.yahoo.com",
-    "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24"',
     "sec-ch-ua-mobile": "?0",
     "sec-fetch-dest": "empty",
     "sec-fetch-mode": "cors",
@@ -85,9 +98,20 @@ async function fetchYahooMonthly(ticker, startDate, endDate) {
   };
 
   let lastError = null;
-  for (const url of urls) {
+  for (let ai = 0; ai < attempts.length; ai++) {
+    const { url, ua } = attempts[ai];
+    const HEADERS = { ...baseHeaders, "User-Agent": ua };
     try {
       const res = await fetch(url, { headers: HEADERS });
+      // Handle rate limit — wait longer before next attempt
+      if (res.status === 429) {
+        console.warn(
+          `[${ticker}] 429 rate limit on attempt ${ai + 1}, waiting 2s...`
+        );
+        await new Promise((r) => setTimeout(r, 2000));
+        lastError = new Error(`Yahoo rate limit (429) para "${ticker}"`);
+        continue;
+      }
       if (res.ok) {
         const json = await res.json();
         const result = json?.chart?.result?.[0];
@@ -146,15 +170,19 @@ async function fetchYahooMonthly(ticker, startDate, endDate) {
       lastError = new Error(`Yahoo respondió ${res.status} para "${ticker}"`);
     } catch (err) {
       lastError = err;
-      console.warn(
-        `[${ticker}] falló ${url.includes("query1") ? "query1" : "query2"}: ${
-          err.message
-        }`
-      );
+      console.warn(`[${ticker}] attempt ${ai + 1} failed: ${err.message}`);
     }
-    await new Promise((r) => setTimeout(r, 400));
+    // Progressive delay: 600ms, 1200ms, 1800ms between retries
+    if (ai < attempts.length - 1) {
+      await new Promise((r) => setTimeout(r, 600 * (ai + 1)));
+    }
   }
-  throw lastError || new Error(`No se pudieron obtener datos para "${ticker}"`);
+  throw (
+    lastError ||
+    new Error(
+      `No se pudieron obtener datos para "${ticker}". Yahoo Finance puede estar bloqueando el servidor.`
+    )
+  );
 }
 
 // ── Alinear por año-mes (YYYY-MM) ─────────────────────────────
