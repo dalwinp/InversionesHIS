@@ -1741,7 +1741,12 @@ function finish(msg) {
   function openSidebar() {
     sidebar.classList.add("open");
     hamburger.classList.add("open");
-    if (overlay) overlay.classList.add("visible");
+    if (overlay) {
+      // Position overlay to START at the sidebar right edge — never covers sidebar
+      const sidebarW = sidebar.getBoundingClientRect().width || 300;
+      overlay.style.left = sidebarW + "px";
+      overlay.classList.add("visible");
+    }
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
   }
@@ -1749,7 +1754,10 @@ function finish(msg) {
   function closeSidebar() {
     sidebar.classList.remove("open");
     hamburger.classList.remove("open");
-    if (overlay) overlay.classList.remove("visible");
+    if (overlay) {
+      overlay.classList.remove("visible");
+      overlay.style.left = "";  // reset
+    }
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
   }

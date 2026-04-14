@@ -1566,7 +1566,7 @@
      inset: 0;
      background: rgba(0, 0, 0, 0.55);
      /* no blur — causes iOS interaction freeze */
-     z-index: 149;
+     z-index: 999;
    }
    .sidebar-overlay.visible {
      display: block;
@@ -1590,7 +1590,7 @@
        left: 0;
        width: min(88vw, 340px);
        height: calc(100dvh - 56px);
-       z-index: 150;
+       z-index: 1000;
        transform: translateX(-100%);
        transition: transform 0.28s var(--ease);
        overflow-y: auto;
@@ -1601,6 +1601,8 @@
      .sidebar.open {
        transform: translateX(0);
        box-shadow: 8px 0 40px rgba(0, 0, 0, 0.5);
+       pointer-events: auto !important;
+       touch-action: pan-y;
      }
      .sidebar .brand {
        display: none;
@@ -1847,4 +1849,16 @@
      .section-panel { padding: 14px 14px 16px; margin-bottom: 10px; border-radius: 12px; }
      .panel-header  { margin-bottom: 10px; }
      .toast { top: 68px; font-size: .78rem; padding: 8px 18px 8px 14px; }
+   }
+   
+   /* ── Touch targets — iOS fix ───────────────────────────────── */
+   .sidebar button, .sidebar input, .sidebar select,
+   .pill, .btn-run, .btn-add, .btn-secondary, .btn-danger,
+   .saved-load, .saved-del, .tax-btn, .asset-remove {
+     touch-action: manipulation;
+     -webkit-tap-highlight-color: rgba(0,0,0,0);
+     cursor: pointer;
+   }
+   .sidebar.open, .sidebar.open * {
+     pointer-events: auto;
    }
