@@ -13,7 +13,7 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <title>InvestLab · Backtesting</title>
+    <title>InvestLab · Portfolio Lab</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   </head>
@@ -21,11 +21,18 @@
     <!-- Mobile top bar — always visible on mobile -->
     <div class="mobile-header" id="mobileHeader">
       <div class="mobile-brand">
-        <span class="brand-icon">📈</span>
+        <span class="brand-mark" aria-hidden="true"></span>
         <span class="brand-name">InvestLab</span>
       </div>
-      <button class="hamburger" id="hamburger" aria-label="Menú">
-        <span></span><span></span><span></span>
+      <button
+        class="mobile-trigger"
+        id="hamburger"
+        aria-label="Abrir parámetros"
+      >
+        <span class="mobile-trigger-label">Parámetros</span>
+        <span class="mobile-trigger-icon" aria-hidden="true"
+          ><span></span><span></span
+        ></span>
       </button>
     </div>
 
@@ -36,11 +43,23 @@
       <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
       <aside class="sidebar" id="sidebar">
         <div class="brand">
-          <span class="brand-icon">📈</span>
+          <span class="brand-mark" aria-hidden="true"></span>
           <div>
             <div class="brand-name">InvestLab</div>
-            <div class="brand-sub">Backtesting Histórico</div>
+            <div class="brand-sub">Portfolio Research Suite</div>
           </div>
+        </div>
+
+        <div class="sidebar-mobile-head">
+          <div class="sidebar-mobile-title">Parámetros</div>
+          <button
+            type="button"
+            class="sidebar-close"
+            id="sidebarClose"
+            aria-label="Cerrar parámetros"
+          >
+            Cerrar
+          </button>
         </div>
 
         <form id="backtestForm" novalidate>
@@ -57,7 +76,7 @@
           <div class="section-label">EJEMPLOS RÁPIDOS</div>
           <div class="preset-grid">
             <div class="preset-group">
-              <div class="preset-group-label">🛡 S&amp;P &amp; Clásicos</div>
+              <div class="preset-group-label">S&amp;P &amp; clásicos</div>
               <span class="pill" data-preset="sp500"
                 >S&amp;P 500 puro · VOO</span
               >
@@ -201,7 +220,7 @@
           </div>
 
           <button type="submit" id="btnSubmit" class="btn-run">
-            <span id="btnText">▶ Ejecutar</span>
+            <span id="btnText">Ejecutar backtest</span>
             <span id="btnSpinner" class="spinner" style="display: none"></span>
           </button>
           <p id="errorMsg" class="error-msg" style="display: none"></p>
@@ -212,9 +231,9 @@
           <div class="section-label">ESTRATEGIAS GUARDADAS</div>
           <div id="savedList" class="saved-list"></div>
           <button id="btnCompare" class="btn-secondary" style="display: none">
-            ⚖️ Comparar seleccionadas
+            Comparar seleccionadas
           </button>
-          <button id="btnClearAll" class="btn-danger">🗑 Limpiar todo</button>
+          <button id="btnClearAll" class="btn-danger">Limpiar guardadas</button>
         </div>
       </aside>
 
@@ -222,7 +241,7 @@
       <main class="main">
         <!-- Empty state -->
         <div id="emptyState" class="empty-state">
-          <div class="empty-icon">💼</div>
+          <div class="empty-icon" aria-hidden="true"></div>
           <h2>Analiza tu portafolio de inversión</h2>
           <p>
             Crea un portafolio con uno o más activos, asigna porcentajes y
@@ -238,7 +257,7 @@
               <h2 id="resultTitle" class="result-title"></h2>
               <p id="resultSubtitle" class="result-subtitle"></p>
             </div>
-            <button id="btnSave" class="btn-save">💾 Guardar</button>
+            <button id="btnSave" class="btn-save">Guardar estrategia</button>
           </div>
 
           <!-- Composición -->
@@ -247,23 +266,23 @@
           <!-- Métricas Retorno -->
           <div class="metrics-group-label">RETORNO</div>
           <div class="metrics-row">
-            <div class="metric-card green">
+            <div class="metric-card return-card m-final">
               <div class="mc-label">Valor Final</div>
               <div class="mc-value" id="mFinal">—</div>
             </div>
-            <div class="metric-card blue">
+            <div class="metric-card return-card m-contrib">
               <div class="mc-label">Capital Aportado</div>
               <div class="mc-value" id="mContrib">—</div>
             </div>
-            <div class="metric-card purple">
+            <div class="metric-card return-card m-profit">
               <div class="mc-label">Ganancia Neta</div>
               <div class="mc-value" id="mProfit">—</div>
             </div>
-            <div class="metric-card teal">
+            <div class="metric-card return-card m-return">
               <div class="mc-label">Retorno Total</div>
               <div class="mc-value" id="mReturn">—</div>
             </div>
-            <div class="metric-card orange">
+            <div class="metric-card return-card m-cagr">
               <div class="mc-label">CAGR (NAV)</div>
               <div class="mc-value" id="mCagr">—</div>
               <div class="mc-hint">Retorno anualizado puro</div>
@@ -273,22 +292,22 @@
           <!-- Métricas Riesgo -->
           <div class="metrics-group-label">RIESGO &amp; ESTADÍSTICAS</div>
           <div class="metrics-row four">
-            <div class="metric-card red">
+            <div class="metric-card risk-card m-drawdown">
               <div class="mc-label">Max Drawdown</div>
               <div class="mc-value" id="mDrawdown">—</div>
               <div class="mc-hint">Peor caída desde un pico</div>
             </div>
-            <div class="metric-card yellow">
+            <div class="metric-card risk-card m-vol">
               <div class="mc-label">Volatilidad Anual</div>
               <div class="mc-value" id="mVol">—</div>
               <div class="mc-hint">Desv. estándar anualizada</div>
             </div>
-            <div class="metric-card indigo">
+            <div class="metric-card risk-card m-sharpe">
               <div class="mc-label">Sharpe Ratio</div>
               <div class="mc-value" id="mSharpe">—</div>
               <div class="mc-hint">Retorno/riesgo (rf=4%)</div>
             </div>
-            <div class="metric-card gray">
+            <div class="metric-card risk-card m-winrate">
               <div class="mc-label">Win Rate</div>
               <div class="mc-value" id="mWinRate">—</div>
               <div class="mc-hint">Meses con retorno positivo</div>
@@ -298,23 +317,23 @@
           <!-- Stats adicionales: mejor/peor mes y año -->
           <div class="stats-extra-row">
             <div class="stat-extra green-b">
-              <div class="se-label">📅 Mejor mes</div>
+              <div class="se-label">Mejor mes</div>
               <div class="se-value" id="sBestMonth">—</div>
             </div>
             <div class="stat-extra red-b">
-              <div class="se-label">📅 Peor mes</div>
+              <div class="se-label">Peor mes</div>
               <div class="se-value" id="sWorstMonth">—</div>
             </div>
             <div class="stat-extra green-b">
-              <div class="se-label">📆 Mejor año</div>
+              <div class="se-label">Mejor año</div>
               <div class="se-value" id="sBestYear">—</div>
             </div>
             <div class="stat-extra red-b">
-              <div class="se-label">📆 Peor año</div>
+              <div class="se-label">Peor año</div>
               <div class="se-value" id="sWorstYear">—</div>
             </div>
             <div class="stat-extra gray-b">
-              <div class="se-label">⏳ Horizonte</div>
+              <div class="se-label">Horizonte</div>
               <div class="se-value" id="mYears">—</div>
             </div>
           </div>
@@ -323,22 +342,22 @@
           <div id="divMetricsWrap" style="display: none">
             <div class="metrics-group-label">DIVIDENDOS &amp; IMPUESTOS</div>
             <div class="metrics-row four">
-              <div class="metric-card lime">
+              <div class="metric-card div-card m-grossdiv">
                 <div class="mc-label">Dividendos brutos</div>
                 <div class="mc-value" id="mGrossDivs">—</div>
                 <div class="mc-hint">Total cobrado antes de impuesto</div>
               </div>
-              <div class="metric-card rose">
+              <div class="metric-card div-card m-taxpaid">
                 <div class="mc-label">Impuesto pagado</div>
                 <div class="mc-value" id="mTaxPaid">—</div>
                 <div class="mc-hint">Retención sobre dividendos</div>
               </div>
-              <div class="metric-card cyan">
+              <div class="metric-card div-card m-netdiv">
                 <div class="mc-label">Dividendos netos</div>
                 <div class="mc-value" id="mNetDivs">—</div>
                 <div class="mc-hint">Reinvertido después de impuesto</div>
               </div>
-              <div class="metric-card slate">
+              <div class="metric-card div-card m-yield">
                 <div class="mc-label">Yield promedio</div>
                 <div class="mc-value" id="mDivYield">—</div>
                 <div class="mc-hint">Sobre capital inicial</div>
@@ -349,7 +368,7 @@
           <!-- Gráfica evolución -->
           <div class="chart-card">
             <div class="chart-header">
-              <span class="chart-title">📈 Evolución del portafolio</span>
+              <span class="chart-title">Evolución del portafolio</span>
               <div class="chart-toggles">
                 <label
                   ><input type="checkbox" id="showValue" checked />
@@ -363,7 +382,7 @@
                   Aportado</label
                 >
                 <label class="toggle-div"
-                  ><input type="checkbox" id="showDivs" checked /> 💰
+                  ><input type="checkbox" id="showDivs" checked />
                   Dividendos</label
                 >
               </div>
@@ -374,7 +393,7 @@
           <!-- Gráfica rendimiento anual -->
           <div class="chart-card">
             <div class="chart-header">
-              <span class="chart-title">📊 Rendimiento anual por año</span>
+              <span class="chart-title">Rendimiento anual por año</span>
             </div>
             <div class="chart-wrap" style="height: 220px">
               <canvas id="annualChart"></canvas>
@@ -386,7 +405,7 @@
             <div class="chart-card">
               <div class="chart-header">
                 <span class="chart-title"
-                  >⚖️ Tabla comparativa de estrategias</span
+                  >Tabla comparativa de estrategias</span
                 >
               </div>
               <div class="table-scroll">
@@ -415,7 +434,7 @@
             <div class="chart-card">
               <div class="chart-header">
                 <span class="chart-title"
-                  >🏆 Ranking de estrategias guardadas</span
+                  >Ranking de estrategias guardadas</span
                 >
                 <select id="rankBy" class="rank-select">
                   <option value="cagr">Por CAGR</option>
@@ -439,7 +458,7 @@
             <!-- Gráfica comparativa CAGR por activo -->
             <div class="chart-card" style="margin-top: 0">
               <div class="chart-header">
-                <span class="chart-title">📊 Comparativa de activos</span>
+                <span class="chart-title">Comparativa de activos</span>
                 <div class="asset-chart-tabs">
                   <button class="tab-btn active" data-metric="cagr">
                     CAGR
@@ -468,7 +487,7 @@
             <div class="chart-card">
               <div class="chart-header">
                 <span class="chart-title"
-                  >📋 Métricas individuales por activo</span
+                  >Métricas individuales por activo</span
                 >
               </div>
               <div class="table-scroll">
@@ -496,9 +515,7 @@
             <!-- Rendimiento anual por activo -->
             <div class="chart-card">
               <div class="chart-header">
-                <span class="chart-title"
-                  >📆 Rendimiento anual — cada activo</span
-                >
+                <span class="chart-title">Rendimiento anual — cada activo</span>
               </div>
               <div class="chart-wrap" style="height: 260px">
                 <canvas id="assetAnnualChart"></canvas>
@@ -512,7 +529,7 @@
             <div class="chart-card">
               <div class="chart-header">
                 <span class="chart-title"
-                  >💰 Dividendos: flujo mensual y acumulado</span
+                  >Dividendos: flujo mensual y acumulado</span
                 >
                 <div class="div-legend">
                   <span class="div-leg-item"
@@ -538,7 +555,7 @@
             <div class="chart-card">
               <div class="chart-header">
                 <span class="chart-title"
-                  >📋 Historial de pagos de dividendos</span
+                  >Historial de pagos de dividendos</span
                 >
                 <span id="divTableCount" class="div-count"></span>
               </div>
@@ -561,7 +578,7 @@
           </div>
 
           <div class="methodology-note">
-            <strong>📐 Metodología:</strong> <strong>CAGR</strong> y
+            <strong>Metodología:</strong> <strong>CAGR</strong> y
             <strong>Max Drawdown</strong> sobre curva
             <strong>NAV</strong> (inversión inicial pura). El portafolio
             multi-activo blendea retornos mensuales según asignaciones. Sharpe
