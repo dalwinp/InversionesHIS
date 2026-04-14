@@ -1700,17 +1700,19 @@ function setLoading(on) {
 // ── Toast notification system ──────────────────────────────────
 let _toastTimer = null;
 function toast(msg, type = "info", duration = 2500) {
-  const el = document.getElementById("toast");
-  if (!el) return;
+  let el = document.getElementById("toast");
+  if (!el) {
+    // Create it if missing
+    el = document.createElement("div");
+    el.id = "toast";
+    document.body.appendChild(el);
+  }
   clearTimeout(_toastTimer);
-  el.textContent = msg;
   el.className = `toast ${type}`;
-  // Force reflow so transition fires
-  void el.offsetWidth;
+  el.innerHTML = `<span class="toast-dot"></span><span>${msg}</span>`;
+  void el.offsetWidth; // force reflow for CSS transition
   el.classList.add("show");
-  _toastTimer = setTimeout(() => {
-    el.classList.remove("show");
-  }, duration);
+  _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
 }
 
 // Keep old names for backward compat but use toast
@@ -1741,6 +1743,7 @@ function finish(msg) {
     hamburger.classList.add("open");
     if (overlay) overlay.classList.add("visible");
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
   }
 
   function closeSidebar() {
@@ -1748,6 +1751,7 @@ function finish(msg) {
     hamburger.classList.remove("open");
     if (overlay) overlay.classList.remove("visible");
     document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
   }
 
   hamburger.addEventListener("click", () =>
@@ -1756,6 +1760,7 @@ function finish(msg) {
 
   // Solo cierra al tocar el overlay oscuro (fuera del sidebar)
   overlay?.addEventListener("click", closeSidebar);
+  overlay?.addEventListener("touchend", e => { e.preventDefault(); closeSidebar(); });
 
   // Cierra SOLO al presionar Ejecutar (submit del form)
   document.getElementById("btnSubmit")?.addEventListener("click", () => {
